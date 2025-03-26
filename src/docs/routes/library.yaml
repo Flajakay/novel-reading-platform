@@ -1,0 +1,429 @@
+openapi: 3.0.0
+tags:
+  - name: Library
+    description: Library management endpoints for users to track their reading progress and manage their reading lists
+
+components:
+  schemas:
+    LibraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 5f7d3abd4c6c1d1234567890
+        user:
+          type: string
+          example: 5f7d3abd4c6c1d1234567891
+        novel:
+          type: object
+          properties:
+            id:
+              type: string
+              example: 5f7d3abd4c6c1d1234567892
+            title:
+              type: string
+              example: The Great Adventure
+            description:
+              type: string
+              example: An epic tale of adventure and discovery
+            author:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 5f7d3abd4c6c1d1234567893
+                username:
+                  type: string
+                  example: john_doe
+            genres:
+              type: array
+              items:
+                type: string
+              example: ["fantasy", "adventure"]
+            status:
+              type: string
+              example: ongoing
+            totalChapters:
+              type: integer
+              example: 42
+            viewCount:
+              type: integer
+              example: 1500
+            calculatedStats:
+              type: object
+              properties:
+                averageRating:
+                  type: number
+                  example: 4.5
+                ratingCount:
+                  type: integer
+                  example: 125
+            hasCover:
+              type: boolean
+              example: true
+        status:
+          type: string
+          enum: [will_read, currently_reading, completed, dropped]
+          example: currently_reading
+        lastReadChapter:
+          type: integer
+          example: 15
+          minimum: 0
+        notes:
+          type: string
+          example: "Great story so far. Love the world building."
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LibraryCheck:
+      type: object
+      properties:
+        inLibrary:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum: [will_read, currently_reading, completed, dropped]
+          example: currently_reading
+        lastReadChapter:
+          type: integer
+          example: 15
+        notes:
+          type: string
+          example: "Great story so far. Love the world building."
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [fail, error]
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+paths:
+  /library:
+    get:
+      tags: [Library]
+      summary: Get user's library
+      description: Retrieves all novels in the authenticated user's library with optional status filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [will_read, currently_reading, completed, dropped]
+          description: Filter library items by status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+      responses:
+        '200':
+          description: User's library successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LibraryItem'
+                      pagination:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                            example: 1
+                          limit:
+                            type: integer
+                            example: 20
+                          total:
+                            type: integer
+                            example: 35
+                          pages:
+                            type: integer
+                            example: 2
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /library/{novelId}:
+    post:
+      tags: [Library]
+      summary: Add novel to library
+      description: Add a novel to the authenticated user's library or update an existing entry
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: string
+          description: ID of the novel to add to library
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [will_read, currently_reading, completed, dropped]
+                  default: will_read
+                  description: Reading status of the novel
+                notes:
+                  type: string
+                  maxLength: 500
+                  description: Personal notes about the novel
+      responses:
+        '200':
+          description: Novel successfully added to library
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/LibraryItem'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Novel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags: [Library]
+      summary: Remove novel from library
+      description: Remove a novel from the authenticated user's library
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: string
+          description: ID of the novel to remove from library
+      responses:
+        '204':
+          description: Novel successfully removed from library
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Novel not found in library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /library/{novelId}/status:
+    patch:
+      tags: [Library]
+      summary: Update library item status
+      description: Update the reading status of a novel in the user's library
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: string
+          description: ID of the novel in the library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [will_read, currently_reading, completed, dropped]
+                  description: New reading status
+      responses:
+        '200':
+          description: Status successfully updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/LibraryItem'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Novel not found in library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /library/{novelId}/last-read:
+    patch:
+      tags: [Library]
+      summary: Update last read chapter
+      description: Update the last read chapter number for a novel in the user's library
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: string
+          description: ID of the novel in the library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - chapterNumber
+              properties:
+                chapterNumber:
+                  type: integer
+                  minimum: 1
+                  description: Last read chapter number
+      responses:
+        '200':
+          description: Last read chapter successfully updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/LibraryItem'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Novel not found in library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /library/{novelId}/check:
+    get:
+      tags: [Library]
+      summary: Check if novel is in library
+      description: Check if a novel is in the authenticated user's library and get its status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: novelId
+          required: true
+          schema:
+            type: string
+          description: ID of the novel to check
+      responses:
+        '200':
+          description: Library check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/LibraryCheck'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

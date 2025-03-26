@@ -1,0 +1,789 @@
+openapi: 3.0.0
+tags:
+  - name: Novels
+    description: Novel management endpoints for creating, reading, updating and deleting novels
+components:
+  schemas:
+    Novel:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 5f7d3abd4c6c1d1234567890
+        title:
+          type: string
+          example: The Great Adventure
+          maxLength: 100
+        description:
+          type: string
+          example: An epic tale of adventure and discovery
+          maxLength: 1000
+        author:
+          type: object
+          properties:
+            id:
+              type: string
+              example: 5f7d3abd4c6c1d1234567891
+            username:
+              type: string
+              example: john_doe
+        genres:
+          type: array
+          items:
+            type: string
+            maxLength: 20
+          maxItems: 5
+          example: ["fantasy", "adventure"]
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 20
+          maxItems: 10
+          example: ["magic", "quest"]
+        status:
+          type: string
+          enum: [ongoing, completed]
+          example: ongoing
+        totalChapters:
+          type: integer
+          example: 42
+          minimum: 0
+        viewCount:
+          type: integer
+          example: 1500
+          minimum: 0
+        hasCover:
+          type: boolean
+          example: true
+        calculatedStats:
+          type: object
+          properties:
+            averageRating:
+              type: number
+              example: 4.5
+              minimum: 0
+              maximum: 5
+            ratingCount:
+              type: integer
+              example: 125
+              minimum: 0
+        ratings:
+          type: array
+          items:
+            type: object
+            properties:
+              user:
+                type: string
+                example: 5f7d3abd4c6c1d1234567892
+              value:
+                type: number
+                minimum: 1
+                maximum: 5
+              createdAt:
+                type: string
+                format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [fail, error]
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              param:
+                type: string
+              msg:
+                type: string
+              value:
+                type: string
+    SearchResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Novel'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total:
+                  type: integer
+                pages:
+                  type: integer
+            facets:
+              type: object
+              properties:
+                genres:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      count:
+                        type: integer
+                tags:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      count:
+                        type: integer
+                ratingRanges:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      range:
+                        type: string
+                      count:
+                        type: integer
+                        
+    AnalyticsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            aggregateStats:
+              type: object
+              properties:
+                totalNovels:
+                  type: integer
+                  example: 15
+                totalViews:
+                  type: integer
+                  example: 12500
+                avgRating:
+                  type: number
+                  example: 4.3
+                totalRatings:
+                  type: integer
+                  example: 340
+                totalChapters:
+                  type: integer
+                  example: 175
+                totalChapterReads:
+                  type: integer
+                  example: 8400
+                totalWords:
+                  type: integer
+                  example: 520000
+
+paths:
+  /novels:
+    post:
+      tags: [Novels]
+      summary: Create a new novel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+                - genres
+                - status
+              properties:
+                title:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "The Dragon's Apprentice"
+                description:
+                  type: string
+                  maxLength: 1000
+                  example: "In a world where dragons are thought to be extinct, young Sarah discovers she possesses an ancient power to communicate with these magnificent creatures. As the last Dragon Speaker, she must navigate political intrigue, master her abilities, and prevent an impending war between humans and the remaining dragons who live in secret."
+                genres:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: string
+                    maxLength: 20
+                  example: ["fantasy", "adventure", "coming-of-age"]
+                tags:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: string
+                    maxLength: 20
+                  example: ["dragons", "magic", "young-adult", "epic-fantasy", "kingdom"]
+                status:
+                  type: string
+                  enum: [ongoing, completed]
+                  example: "ongoing"
+                cover:
+                  type: string
+                  format: binary
+                  description: "Cover image for the novel. Supported formats: JPEG, PNG, WebP. Max size: 5MB."
+      responses:
+        '201':
+          description: Novel created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/Novel'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+
+    get:
+      tags: [Novels]
+      summary: Get novels with enhanced search capabilities
+      description: |
+        Advanced search endpoint powered by Elasticsearch. Supports full-text search,
+        faceted filtering, and various sorting options.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Full-text search query for title and description with fuzzy matching
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [default]
+            default: default
+          description: |
+            - default
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [relevance, rating, views, recent, chapters]
+            default: relevance
+          description: |
+            - relevance: Best match for search query
+            - rating: Average rating
+            - views: View count
+            - recent: Last updated
+            - chapters: Number of chapters
+        - in: query
+          name: genres
+          schema:
+            type: array
+            items:
+              type: string
+              
+        - in: query
+          name: tags
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ongoing, completed]
+        - in: query
+          name: author
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 20
+          description: Search by author username (supports both exact and partial matches)
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+      responses:
+        '200':
+          description: Search results with optional facets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid search parameters
+
+
+
+  /novels/{id}:
+    get:
+      tags: [Novels]
+      summary: Get novel by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Novel details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/Novel'
+        '404':
+          description: Novel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags: [Novels]
+      summary: Update novel
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "The Dragon's Apprentice: Rise of the Speaker"
+                description:
+                  type: string
+                  maxLength: 1000
+                  example: "Sarah's journey continues as she grows stronger in her role as the Dragon Speaker. After uncovering an ancient prophecy, she realizes that her bond with dragons goes deeper than anyone could have imagined. With war looming on the horizon and dark forces working from the shadows, Sarah must unite both humans and dragons before it's too late."
+                genres:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: string
+                    maxLength: 20
+                  example: ["fantasy", "adventure", "coming-of-age", "action"]
+                tags:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: string
+                    maxLength: 20
+                  example: ["dragons", "magic", "young-adult", "epic-fantasy", "kingdom", "prophecy", "war"]
+                status:
+                  type: string
+                  enum: [ongoing, completed]
+                  example: "ongoing"
+                cover:
+                  type: string
+                  format: binary
+                  description: "Cover image for the novel. Supported formats: JPEG, PNG, WebP. Max size: 5MB."
+      responses:
+        '200':
+          description: Novel updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/Novel'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Novel not found
+
+    delete:
+      tags: [Novels]
+      summary: Delete novel
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Novel deleted successfully
+        '401':
+          description: Not authenticated
+        '404':
+          description: Novel not found
+
+  /novels/{id}/cover:
+    get:
+      tags: [Novels]
+      summary: Get novel cover image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Novel cover image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Novel or cover not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      tags: [Novels]
+      summary: Delete novel cover image
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cover deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/Novel'
+        '401':
+          description: Not authenticated
+        '404':
+          description: Novel not found
+
+  /novels/{id}/ratings:
+    post:
+      tags: [Novels]
+      summary: Add or update rating for a novel
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+              properties:
+                rating:
+                  type: number
+                  minimum: 1
+                  maximum: 5
+      responses:
+        '200':
+          description: Rating added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      averageRating:
+                        type: number
+                      ratingCount:
+                        type: integer
+        '400':
+          description: Invalid rating value
+        '401':
+          description: Not authenticated
+        '404':
+          description: Novel not found
+
+  /novels/{id}/increment-view:
+    post:
+      tags: [Novels]
+      summary: Increment novel view count
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: View count incremented successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      viewCount:
+                        type: integer
+        '404':
+          description: Novel not found
+  /novels/author/{authorId}:
+    get:
+      tags: [Novels]
+      summary: Get novels by author ID
+      description: Retrieve all novels written by a specific author
+      parameters:
+        - in: path
+          name: authorId
+          required: true
+          schema:
+            type: string
+          description: ID of the author
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ongoing, completed]
+          description: Filter by novel status
+      responses:
+        '200':
+          description: List of author's novels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Novel'
+                      pagination:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+                          total:
+                            type: integer
+                          pages:
+                            type: integer
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /novels/author/{authorId}/analytics:
+    get:
+      tags: [Novels]
+      summary: Get author's analytics data
+      description: Retrieve analytics data for novels written by a specific author
+      parameters:
+        - in: path
+          name: authorId
+          required: true
+          schema:
+            type: string
+          description: ID of the author
+      responses:
+        '200':
+          description: Author analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /novels/me:
+    get:
+      tags: [Novels]
+      summary: Get authenticated user's novels
+      description: Retrieves a paginated list of novels created by the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+      responses:
+        '200':
+          description: Successfully retrieved user's novels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Novel'
+                      pagination:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                            example: 1
+                          limit:
+                            type: integer
+                            example: 20
+                          total:
+                            type: integer
+                            example: 42
+                          pages:
+                            type: integer
+                            example: 3
+        '401':
+          description: Not authenticated

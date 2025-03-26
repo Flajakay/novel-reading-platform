@@ -1,0 +1,101 @@
+tags:
+  - name: System
+    description: System health and test endpoints 
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check endpoint
+      description: Returns the API's health status and uptime
+      responses:
+        '200':
+          description: System health information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                    description: System uptime in seconds
+
+  /test:
+    get:
+      tags: [System]
+      summary: Test endpoint
+      description: Simple endpoint to test if the API is responding
+      responses:
+        '200':
+          description: Test response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: API is working!
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /hello/{name}:
+    get:
+      tags: [System]
+      summary: Personalized greeting endpoint
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+          description: Name to greet
+      responses:
+        '200':
+          description: Returns greeting with provided name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Hello, John!
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /echo:
+    post:
+      tags: [System]
+      summary: Echo endpoint
+      description: Returns the request body and timestamp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Echo response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Received POST request
+                  body:
+                    type: object
+                    description: The request body that was sent
+                  timestamp:
+                    type: string
+                    format: date-time

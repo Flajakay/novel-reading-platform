@@ -1,0 +1,422 @@
+openapi: 3.0.0
+tags:
+  - name: Auth
+    description: Authentication endpoints for user registration and login
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              param:
+                type: string
+              msg:
+                type: string
+              value:
+                type: string
+    
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+    
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 5f7d3abd4c6c1d1234567890
+        email:
+          type: string
+          example: user@example.com
+        username:
+          type: string
+          example: john_doe
+        dateOfBirth:
+          type: string
+          format: date
+          example: "1990-01-01"
+        role:
+          type: string
+          enum: [user, admin, author]
+          example: user
+    
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Create a new user account with email, username, password and date of birth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - username
+                - password
+                - dateOfBirth
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 100
+                  example: user@example.com
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 20
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                  example: john_doe
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 15
+                  pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d\W_]*$'
+                  description: Must contain at least one uppercase letter, one lowercase letter, and one number
+                  example: Password123
+                dateOfBirth:
+                  type: string
+                  format: date
+                  description: Must be a valid date in YYYY-MM-DD format. User must be at least 13 years old.
+                  example: "1990-01-01"
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 5f7d3abd4c6c1d1234567890
+                      email:
+                        type: string
+                        example: user@example.com
+                      username:
+                        type: string
+                        example: john_doe
+                      dateOfBirth:
+                        type: string
+                        format: date
+                        example: "1990-01-01"
+                      createdAt:
+                        type: string
+                        format: date-time
+                        example: 2024-01-05T12:00:00Z
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email or username already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Email or username already exists
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      description: Authenticate user and receive access and refresh tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  example: Password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/UserResponse'
+                      accessToken:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIs...
+                      refreshToken:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIs...
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    enum:
+                      - Invalid credentials
+                      - Account is temporarily locked
+        '429':
+          description: Too many failed login attempts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Too many requests from this IP, please try again later.
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Retrieve the profile of currently authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIs...
+      responses:
+        '200':
+          description: Token successfully refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIs...
+                      user:
+                        $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Invalid or expired refresh token
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user
+      description: Invalidate the current user's session
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Successfully logged out
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/reset-password-request:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      description: Send a password reset request for a user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Reset request processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: If an account exists with that email, a password reset link will be sent.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password
+      description: Reset user password using the token received via email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - newPassword
+              properties:
+                token:
+                  type: string
+                  example: abc123def456...
+                newPassword:
+                  type: string
+                  minLength: 8
+                  pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d\W_]*$'
+                  description: Must contain at least one uppercase letter, one lowercase letter, and one number
+                  example: NewPassword123
+      responses:
+        '200':
+          description: Password successfully reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Password has been reset successfully
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Invalid or expired reset token

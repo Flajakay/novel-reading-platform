@@ -1,0 +1,273 @@
+paths:
+  /recommendations:
+    get:
+      tags:
+        - Recommendations
+      summary: Get all recommendations for the authenticated user
+      description: Retrieves all types of recommendations for the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          description: Maximum number of recommendations per type
+        - in: query
+          name: refresh
+          schema:
+            type: boolean
+            default: false
+          description: Whether to refresh cached recommendations
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      becauseYouRead:
+                        $ref: '#/components/schemas/NovelRecommendations'
+                      readersLikeYou:
+                        $ref: '#/components/schemas/NovelRecommendations'
+                      popularInGenre:
+                        $ref: '#/components/schemas/GenreRecommendations'
+                      fromAuthorsYouFollow:
+                        $ref: '#/components/schemas/AuthorRecommendations'
+                      continueReading:
+                        $ref: '#/components/schemas/NovelRecommendations'
+        '401':
+          description: Unauthorized - User not authenticated
+        '500':
+          description: Server error
+
+  /recommendations/because-you-read:
+    get:
+      tags:
+        - Recommendations
+      summary: Get "Because You Read" recommendations
+      description: Retrieves novel recommendations based on the user's reading history
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          description: Maximum number of recommendations
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/NovelRecommendations'
+        '401':
+          description: Unauthorized - User not authenticated
+        '500':
+          description: Server error
+          
+  /recommendations/popular-in-genre:
+    get:
+      tags:
+        - Recommendations
+      summary: Get "Popular in Genre" recommendations
+      description: Retrieves popular novel recommendations in the user's favorite genres
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          description: Maximum number of recommendations
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/GenreRecommendations'
+        '401':
+          description: Unauthorized - User not authenticated
+        '500':
+          description: Server error
+          
+  /recommendations/from-authors:
+    get:
+      tags:
+        - Recommendations
+      summary: Get "From Authors You Follow" recommendations
+      description: Retrieves novel recommendations from authors the user has read before
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          description: Maximum number of recommendations
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: '#/components/schemas/AuthorRecommendations'
+        '401':
+          description: Unauthorized - User not authenticated
+        '500':
+          description: Server error
+
+components:
+  schemas:
+    NovelRecommendations:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              novel:
+                $ref: '#/components/schemas/Novel'
+              reason:
+                type: string
+                description: Reason for the recommendation
+                example: "Because you read The Alchemist"
+              sourceNovel:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: ID of the source novel
+                  title:
+                    type: string
+                    description: Title of the source novel
+    
+    GenreRecommendations:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              novel:
+                $ref: '#/components/schemas/Novel'
+              genre:
+                type: string
+                description: Genre the recommendation is based on
+                example: "fantasy"
+              reason:
+                type: string
+                description: Reason for the recommendation
+                example: "Popular in fantasy"
+    
+    AuthorRecommendations:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              novel:
+                $ref: '#/components/schemas/Novel'
+              author:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+              reason:
+                type: string
+                description: Reason for the recommendation
+                example: "More from Jane Doe"
+    
+    Novel:
+      type: object
+      properties:
+        _id:
+          type: string
+          format: uuid
+          description: Novel ID
+        title:
+          type: string
+          description: Novel title
+        description:
+          type: string
+          description: Novel description
+        author:
+          type: object
+          properties:
+            _id:
+              type: string
+              format: uuid
+            username:
+              type: string
+        genres:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        totalChapters:
+          type: integer
+        viewCount:
+          type: integer
+        calculatedStats:
+          type: object
+          properties:
+            averageRating:
+              type: number
+              format: float
+            ratingCount:
+              type: integer
+        hasCover:
+          type: boolean

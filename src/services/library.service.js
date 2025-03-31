@@ -4,6 +4,9 @@ const { NotFoundError } = require('../utils/errors');
 const { NOVEL_ERRORS, LIBRARY_STATUS } = require('../utils/constants');
 const logger = require('../utils/logger');
 
+// Import recommendation service to invalidate cache
+const RecommendationService = require('./recommendation/recommendation.service');
+
 const LibraryService = {
     async getUserLibrary(userId, query = {}) {
         const page = parseInt(query.page) || 1;
@@ -60,6 +63,9 @@ const LibraryService = {
             { upsert: true, new: true, runValidators: true }
         );
         
+        // Invalidate user's recommendation cache
+        RecommendationService.invalidateUserRecommendations(userId);
+        
         return libraryItem;
     },
     
@@ -68,6 +74,10 @@ const LibraryService = {
         if (!result) {
             throw new NotFoundError('Novel not found in library');
         }
+        
+        // Invalidate user's recommendation cache
+        RecommendationService.invalidateUserRecommendations(userId);
+        
         return { success: true };
     },
     
@@ -79,6 +89,9 @@ const LibraryService = {
         
         libraryItem.status = newStatus;
         await libraryItem.save();
+        
+        // Invalidate user's recommendation cache when status changes
+        RecommendationService.invalidateUserRecommendations(userId);
         
         return libraryItem;
     },
@@ -98,6 +111,9 @@ const LibraryService = {
         
         libraryItem.lastReadChapter = chapterNumber;
         await libraryItem.save();
+        
+        // Reading progress changes can affect continue-reading recommendations
+        RecommendationService.invalidateUserRecommendations(userId);
         
         return libraryItem;
     },

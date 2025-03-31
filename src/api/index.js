@@ -51,5 +51,8 @@ router.use('/novels', novelRoutes);
 const libraryRoutes = require('./library.controller');
 router.use('/library', libraryRoutes); 
 
+const recommendationRoutes = require('./recommendation.controller');
+router.use('/recommendations', recommendationRoutes);
+
 module.exports = router;
 

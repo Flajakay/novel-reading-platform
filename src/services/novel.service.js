@@ -1,6 +1,7 @@
 const Novel = require('../models/novel.model');
 const User = require('../models/user.model'); 
 const elasticsearchService = require('./elasticsearch.service');
+const RecommendationService = require('./recommendation/recommendation.service');
 const {
 	NotFoundError,
 	ValidationError
@@ -239,6 +240,9 @@ const NovelService = {
 		
 		await elasticsearchService.updateNovel(novelId, esNovel);
 
+		// Invalidate user's recommendation cache after rating a novel
+		RecommendationService.invalidateUserRecommendations(userId);
+
 		return {
 			id: novel._id,
 			averageRating: novel.calculatedStats.averageRating,
@@ -267,6 +271,9 @@ const NovelService = {
 		const esNovel = prepareNovelForElasticsearch(novel);
 		
 		await elasticsearchService.updateNovel(novelId, esNovel);
+
+		// Invalidate user's recommendation cache after removing a rating
+		RecommendationService.invalidateUserRecommendations(userId);
 
 		return {
 			id: novel._id,

@@ -1,5 +1,6 @@
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
 
 const readableFormat = winston.format.printf(({
 	level,
@@ -50,6 +51,34 @@ const consoleFormat = winston.format.combine(
 
 const logsDir = path.join(process.cwd(), 'logs');
 
+// Create timestamped folder for this server session
+const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+const sessionLogsDir = path.join(logsDir, timestamp);
+
+// Create logs directory and session directory if they don't exist
+if (!fs.existsSync(logsDir)) {
+	fs.mkdirSync(logsDir);
+}
+if (!fs.existsSync(sessionLogsDir)) {
+	fs.mkdirSync(sessionLogsDir);
+}
+
+console.log(`Logging to session directory: ${sessionLogsDir}`);
+
+// Create a symbolic link to the latest logs directory
+const latestLogsDir = path.join(logsDir, 'latest');
+try {
+	// Remove previous symbolic link if it exists
+	if (fs.existsSync(latestLogsDir)) {
+		fs.unlinkSync(latestLogsDir);
+	}
+	// Create a new symbolic link
+	fs.symlinkSync(sessionLogsDir, latestLogsDir, 'dir');
+} catch (error) {
+	// Handle errors when creating symbolic link (might require admin privileges on Windows)
+	console.error(`Failed to create symbolic link to latest logs: ${error.message}`);
+}
+
 const transports = [
 	// Console transport with colors
 	new winston.transports.Console({
@@ -58,7 +87,7 @@ const transports = [
 	}),
 	// File transport for errors
 	new winston.transports.File({
-		filename: path.join(logsDir, 'error.log'),
+		filename: path.join(sessionLogsDir, 'error.log'),
 		level: 'error',
 		format: logFormat,
 		maxsize: 5242880, // 5MB
@@ -66,7 +95,7 @@ const transports = [
 	}),
 	// File transport for all logs
 	new winston.transports.File({
-		filename: path.join(logsDir, 'combined.log'),
+		filename: path.join(sessionLogsDir, 'combined.log'),
 		format: logFormat,
 		maxsize: 5242880, // 5MB
 		maxFiles: 5,
@@ -80,7 +109,7 @@ const logger = winston.createLogger({
 	// Handle uncaught exceptions and rejections
 	exceptionHandlers: [
 		new winston.transports.File({
-			filename: path.join(logsDir, 'exceptions.log'),
+			filename: path.join(sessionLogsDir, 'exceptions.log'),
 			format: logFormat,
 			maxsize: 5242880, // 5MB
 			maxFiles: 5,
@@ -88,7 +117,7 @@ const logger = winston.createLogger({
 	],
 	rejectionHandlers: [
 		new winston.transports.File({
-			filename: path.join(logsDir, 'rejections.log'),
+			filename: path.join(sessionLogsDir, 'rejections.log'),
 			format: logFormat,
 			maxsize: 5242880, // 5MB
 			maxFiles: 5,
